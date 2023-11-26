@@ -24,6 +24,13 @@ find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED COMPONENTS core highgui imgproc features2d)
+if(OpenCV_CUDA_VERSION)
+    add_definitions(-DHAVE_CUDA)
+endif()
+
+find_package(CUDA REQUIRED)
+include_directories(${CUDA_INCLUDE_DIRS})
+find_library(NVTX_LIBRARY nvToolsExt PATHS ENV LD_LIBRARY_PATH)
 
 if(MAKE_SCENE)
 	message(STATUS "Building ROVIO with openGL Scene Visualization")
@@ -107,7 +114,7 @@ if(MAKE_SCENE)
 else()
 	add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
 endif()
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES} ${OpenMP_EXE_LINKER_FLAGS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${OpenCV_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES} ${OpenMP_EXE_LINKER_FLAGS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${OpenCV_LIBRARIES} ${CUDA_LIBRARIES} ${NVTX_LIBRARY})
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} rovio_generate_messages_cpp)
 
 add_executable(rovio_node src/rovio_node.cpp)

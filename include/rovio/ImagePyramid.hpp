@@ -29,7 +29,14 @@
 #ifndef IMAGEPYRAMID_HPP_
 #define IMAGEPYRAMID_HPP_
 
+#ifdef HAVE_CUDA
+#include <nvToolsExt.h>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/cudafeatures2d.hpp>
+#include <opencv2/cudawarping.hpp>
+#else
 #include <opencv2/features2d/features2d.hpp>
+#endif
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "rovio/FeatureCoordinates.hpp"
@@ -69,6 +76,9 @@ class ImagePyramid{
  public:
   ImagePyramid(){};
   virtual ~ImagePyramid(){};
+#ifdef HAVE_CUDA
+  cv::cuda::GpuMat gpu_imgs_[n_levels]; /**<Array, containing the pyramid images.*/
+#endif
   cv::Mat imgs_[n_levels]; /**<Array, containing the pyramid images.*/
   cv::Point2f centers_[n_levels]; /**<Array, containing the image center coordinates (in pixel), defined in an
                                       image centered coordinate system of the image at level 0.*/
@@ -79,25 +89,42 @@ class ImagePyramid{
    *   @param useCv - Set to true, if opencv (cv::pyrDown) should be used for the pyramid creation.
    */
   void computeFromImage(const cv::Mat& img, const bool useCv = false){
+#ifdef HAVE_CUDA
+    gpu_imgs_[0].upload(img);
+#endif
     img.copyTo(imgs_[0]);
     centers_[0] = cv::Point2f(0,0);
+#ifdef HAVE_CUDA
+nvtxRangePush("pyrDown");
+#endif
     for(int i=1; i<n_levels; ++i){
       if(!useCv){
         halfSample(imgs_[i-1],imgs_[i]);
         centers_[i].x = centers_[i-1].x-pow(0.5,2-i)*(float)(imgs_[i-1].rows%2);
         centers_[i].y = centers_[i-1].y-pow(0.5,2-i)*(float)(imgs_[i-1].cols%2);
       } else {
+#ifdef HAVE_CUDA
+        cv::cuda::pyrDown(gpu_imgs_[i-1],gpu_imgs_[i]);
+        gpu_imgs_[i].download(imgs_[i]);
+#else
         cv::pyrDown(imgs_[i-1],imgs_[i],cv::Size(imgs_[i-1].cols/2, imgs_[i-1].rows/2));
+#endif
         centers_[i].x = centers_[i-1].x-pow(0.5,2-i)*(float)((imgs_[i-1].rows%2)+1);
         centers_[i].y = centers_[i-1].y-pow(0.5,2-i)*(float)((imgs_[i-1].cols%2)+1);
       }
     }
+#ifdef HAVE_CUDA
+nvtxRangePop();
+#endif
   }
 
   /** \brief Copies the image pyramid.
    */
   ImagePyramid<n_levels>& operator=(const ImagePyramid<n_levels> &rhs) {
     for(unsigned int i=0;i<n_levels;i++){
+#ifdef HAVE_CUDA
+      rhs.gpu_imgs_[i].copyTo(gpu_imgs_[i]);
+#endif
       rhs.imgs_[i].copyTo(imgs_[i]);
       centers_[i] = rhs.centers_[i];
     }
@@ -142,8 +169,17 @@ class ImagePyramid{
     cv::FastFeatureDetector feature_detector_fast(detectionThreshold, true);
     feature_detector_fast.detect(imgs_[l], keypoints);
 #else
+#ifdef HAVE_CUDA
+nvtxRangePush("FastFeatureDetector");
+    // cv::cuda::GpuMat gpu_img(imgs_[l]);
+    auto feature_detector_fast = cv::cuda::FastFeatureDetector::create(detectionThreshold, true);
+    // feature_detector_fast->detect(gpu_img, keypoints);
+    feature_detector_fast->detect(gpu_imgs_[l], keypoints);
+nvtxRangePop();
+#else
     auto feature_detector_fast = cv::FastFeatureDetector::create(detectionThreshold, true);
     feature_detector_fast->detect(imgs_[l], keypoints);
+#endif
 #endif
 
     candidates.reserve(candidates.size()+keypoints.size());
