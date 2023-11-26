@@ -171,9 +171,7 @@ nvtxRangePop();
 #else
 #ifdef HAVE_CUDA
 nvtxRangePush("FastFeatureDetector");
-    // cv::cuda::GpuMat gpu_img(imgs_[l]);
     auto feature_detector_fast = cv::cuda::FastFeatureDetector::create(detectionThreshold, true);
-    // feature_detector_fast->detect(gpu_img, keypoints);
     feature_detector_fast->detect(gpu_imgs_[l], keypoints);
 nvtxRangePop();
 #else
