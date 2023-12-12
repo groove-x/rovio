@@ -190,7 +190,7 @@ class MultilevelPatch{
   static bool isMultilevelPatchInFrame(const ImagePyramid<nLevels>& pyr,const FeatureCoordinates& c, const int l = nLevels-1,const bool withBorder = false){
     if(!c.isInFront() || !c.com_warp_c()) return false;
     const auto coorTemp = pyr.levelTranformCoordinates(c,0,l);
-    return Patch<patchSize>::isPatchInFrame(pyr.imgs_[l],coorTemp,withBorder);
+    return Patch<patchSize>::isPatchInFrame(pyr.gpu_imgs_[l],coorTemp,withBorder);
   }
 
   /** \brief Extracts a multilevel patch from a given image pyramid.
@@ -205,7 +205,7 @@ class MultilevelPatch{
     for(unsigned int i=0;i<=l;i++){
       const auto coorTemp = pyr.levelTranformCoordinates(c,0,i);
       isValidPatch_[i] = true;
-      patches_[i].extractPatchFromImage(pyr.imgs_[i],coorTemp,withBorder);
+      patches_[i].extractPatchFromImage(pyr.gpu_imgs_[i],coorTemp,withBorder);
     }
   }
 };

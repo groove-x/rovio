@@ -109,12 +109,18 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${YamlCpp_INCLUDE_DIRS})
 
+if(CUDA_FOUND)
+	CUDA_ADD_LIBRARY(${PROJECT_NAME}_CUDA STATIC
+		src/Patch.cu
+	)
+endif()
+
 if(MAKE_SCENE)
 	add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp src/Scene.cpp)
 else()
 	add_library(${PROJECT_NAME} src/Camera.cpp src/FeatureCoordinates.cpp src/FeatureDistance.cpp)
 endif()
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES} ${OpenMP_EXE_LINKER_FLAGS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${OpenCV_LIBRARIES} ${CUDA_LIBRARIES} ${NVTX_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${YamlCpp_LIBRARIES} ${OpenMP_EXE_LINKER_FLAGS} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${OpenCV_LIBRARIES} ${CUDA_LIBRARIES} ${NVTX_LIBRARY} ${PROJECT_NAME}_CUDA)
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} rovio_generate_messages_cpp)
 
 add_executable(rovio_node src/rovio_node.cpp)

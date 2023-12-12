@@ -29,8 +29,11 @@
 #ifndef ROVIO_PATCH_HPP_
 #define ROVIO_PATCH_HPP_
 
+#include <cuda_runtime.h>
+
 #include "lightweight_filtering/common.hpp"
 #include "rovio/FeatureCoordinates.hpp"
+#include "rovio/Patch.cuh"
 
 namespace rovio{
 
@@ -41,6 +44,13 @@ namespace rovio{
 template<int patchSize>
 class Patch {
  public:
+#ifdef HAVE_CUDA
+  float *gpu_patch_;
+  float *gpu_patchWithBorder_;
+  float *gpu_dx_;
+  float *gpu_dy_;
+  float *gpu_H_;
+#endif
   float patch_[patchSize*patchSize] __attribute__ ((aligned (16)));  /**<Array, containing the intensity values of the patch.*/
   float patchWithBorder_[(patchSize+2)*(patchSize+2)] __attribute__ ((aligned (16)));  /**<Array, containing the intensity values of the expanded patch.
                                                                                  This expanded patch is necessary for the intensity gradient calculation.*/
@@ -60,10 +70,25 @@ class Patch {
     s_ = 0.0;
     e0_ = 0.0;
     e1_ = 0.0;
+#ifdef HAVE_CUDA
+    cudaMalloc(&gpu_patch_, sizeof(float) * patchSize * patchSize);
+    cudaMalloc(&gpu_patchWithBorder_, sizeof(float) * (patchSize+2) * (patchSize+2));
+    cudaMalloc(&gpu_dx_, sizeof(float) * patchSize * patchSize);
+    cudaMalloc(&gpu_dy_, sizeof(float) * patchSize * patchSize);
+    cudaMalloc(&gpu_H_, sizeof(float) * 3 * 3);
+#endif
   }
   /** \brief Destructor
    */
-  virtual ~Patch(){}
+  virtual ~Patch(){
+#ifdef HAVE_CUDA
+    cudaFree(gpu_patch_);
+    cudaFree(gpu_patchWithBorder_);
+    cudaFree(gpu_dx_);
+    cudaFree(gpu_dy_);
+    cudaFree(gpu_H_);
+#endif
+  }
 
   /** \brief Computes the gradient parameters of the patch (patch gradient components dx_ dy_, Hessian H_, Shi-Tomasi Score s_, Eigenvalues of the Hessian e0_ and e1_).
    *         The expanded patch patchWithBorder_ must be set.
@@ -197,7 +222,11 @@ class Patch {
    *                       of the expanded patch Patch::patchWithBorder_ (withBorder = true).
    *   @return true, if the patch is completely located within the reference image.
    */
+#ifdef HAVE_CUDA
+  static bool isPatchInFrame(const cv::cuda::GpuMat& img,const FeatureCoordinates& c,const bool withBorder = false){
+#else
   static bool isPatchInFrame(const cv::Mat& img,const FeatureCoordinates& c,const bool withBorder = false){
+#endif
     if(c.isInFront() && c.com_warp_c()){
       const int halfpatch_size = patchSize/2+(int)withBorder;
       if(c.isNearIdentityWarping()){
@@ -237,6 +266,20 @@ class Patch {
    *                       If true, the patch object is initialized with both, the patch data of the general patch (Patch::patch_)
    *                       and the patch data of the expanded patch (Patch::patchWithBorder_).
    */
+#ifdef HAVE_CUDA
+  void extractPatchFromImage(const cv::cuda::GpuMat& img, const FeatureCoordinates& c, const bool withBorder = false) {
+    assert(isPatchInFrame(img,c,withBorder));
+
+    loadExtractPatchFromImageKernel(img, gpu_patch_, gpu_patchWithBorder_, patchSize, c);
+
+    // copy gpu_patch_ to patch_
+    cudaMemcpy(patch_, gpu_patch_, sizeof(float) * patchSize * patchSize, cudaMemcpyDeviceToHost);
+    // copy gpu_patchWithBorder_ to patchWithBorder_
+    cudaMemcpy(patchWithBorder_, gpu_patchWithBorder_, sizeof(float) * (patchSize+2) * (patchSize+2), cudaMemcpyDeviceToHost);
+
+    validGradientParameters_ = false;
+  }
+#else
   void extractPatchFromImage(const cv::Mat& img,const FeatureCoordinates& c,const bool withBorder = false){
     assert(isPatchInFrame(img,c,withBorder));
     const int halfpatch_size = patchSize/2+(int)withBorder;
@@ -302,6 +345,7 @@ class Patch {
     }
     validGradientParameters_ = false;
   }
+#endif
 };
 
 }

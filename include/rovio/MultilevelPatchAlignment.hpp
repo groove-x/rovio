@@ -136,12 +136,12 @@ class MultilevelPatchAlignment {
     }
     for(int l = l1; l <= l2; l++){
       const auto c_level = pyr.levelTranformCoordinates(c,0,l);
-      if(mp.isValidPatch_[l] && extractedPatches_[l].isPatchInFrame(pyr.imgs_[l],c_level,false)){
+      if(mp.isValidPatch_[l] && extractedPatches_[l].isPatchInFrame(pyr.gpu_imgs_[l],c_level,false)){
         mp.patches_[l].computeGradientParameters();
         if(mp.patches_[l].validGradientParameters_){
           mlpError_.isValidPatch_[l] = true;
           numLevel++;
-          extractedPatches_[l].extractPatchFromImage(pyr.imgs_[l],c_level,false);
+          extractedPatches_[l].extractPatchFromImage(pyr.gpu_imgs_[l],c_level,false);
           const float* it_patch_extracted = extractedPatches_[l].patch_;
           const float* it_patch = mp.patches_[l].patch_;
           const float* it_dx = mp.patches_[l].dx_;
