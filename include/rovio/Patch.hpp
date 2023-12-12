@@ -268,15 +268,27 @@ class Patch {
    */
 #ifdef HAVE_CUDA
   void extractPatchFromImage(const cv::cuda::GpuMat& img, const FeatureCoordinates& c, const bool withBorder = false) {
-    assert(isPatchInFrame(img,c,withBorder));
+    assert(isPatchInFrame(img, c, withBorder));
+    const int halfpatch_size = patchSize / 2 + (int)withBorder;
 
-    loadExtractPatchFromImageKernel(img, gpu_patch_, gpu_patchWithBorder_, patchSize, c);
+    // Get Pointers
+    float* patch_ptr;
+    if (withBorder) {
+      patch_ptr = gpu_patchWithBorder_;
+    } else {
+      patch_ptr = gpu_patch_;
+    }
+
+    loadExtractPatchFromImageKernel(img, patch_ptr, halfpatch_size, c);
 
     // copy gpu_patch_ to patch_
     cudaMemcpy(patch_, gpu_patch_, sizeof(float) * patchSize * patchSize, cudaMemcpyDeviceToHost);
     // copy gpu_patchWithBorder_ to patchWithBorder_
     cudaMemcpy(patchWithBorder_, gpu_patchWithBorder_, sizeof(float) * (patchSize+2) * (patchSize+2), cudaMemcpyDeviceToHost);
 
+    if(withBorder){
+      extractPatchFromPatchWithBorder();
+    }
     validGradientParameters_ = false;
   }
 #else
